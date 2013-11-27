@@ -3,21 +3,31 @@ require 'mechanize'
 
 module TorPrivoxy
   class Agent
+
+    attr_accessor :retry_limit  # retry Mechanize action no more than retry_count times
+
     def initialize host, pass, control, &callback
       @proxy = Switcher.new host, pass, control
       @mechanize = Mechanize.new
       @mechanize.set_proxy(@proxy.host, @proxy.port)
       @circuit_timeout = 10
+      @retry_limit = 3
       @callback = callback
       @callback.call self
     end
 
     def method_missing method, *args, &block
+      try = 0
       begin
         @mechanize.send method, *args, &block
-      rescue Mechanize::ResponseCodeError # 403 etc
-        switch_circuit
-        retry
+      rescue Mechanize::ResponseCodeError => e # 403 etc
+        try += 1
+        if try <= @retry_limit
+          switch_circuit
+          retry
+        else
+          raise e   # cant help, maybe site is really broken?
+        end
       end
     end
 
