@@ -21,13 +21,18 @@ module TorPrivoxy
       begin
         @mechanize.send method, *args, &block
       rescue Mechanize::ResponseCodeError => e # 403 etc
-        try += 1
-        if try <= @retry_limit
-          switch_circuit
-          retry
-        else
+	if e.response_code == "403"
+          try += 1
+
+          if try <= @retry_limit
+            switch_circuit
+            retry
+          else
+            raise e   # cant help, maybe site is really broken?
+          end
+	else
           raise e   # cant help, maybe site is really broken?
-        end
+	end
       end
     end
 
